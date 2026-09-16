@@ -1,0 +1,31 @@
+services:
+  mongo:
+    image: mongo:7
+    volumes: [mongo-data:/data/db]
+  app:
+    build: .
+    ports: ["4000:4000"]
+    depends_on: [mongo, quickbite]
+    environment:
+      MONGODB_URI: mongodb://mongo:27017/ai_qa_saas
+      JWT_SECRET: ${JWT_SECRET:-change-me-in-production}
+      APP_ENCRYPTION_KEY: ${APP_ENCRYPTION_KEY:-change-me-in-production}
+      APP_URL: http://localhost:4000
+      # The demo target runs on the compose network; keep private targets allowed for this local setup only.
+      ALLOW_PRIVATE_TARGETS: "true"
+      ALLOW_LOCAL_REPOS: "true"
+      DEMO_APP_URL: http://quickbite:4100/
+      DEMO_REPO_PATH: /quickbite
+      ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY:-}
+    volumes:
+      - storage:/data/storage
+      - ./quickbite:/quickbite:ro
+  quickbite:
+    image: node:22-bookworm-slim
+    working_dir: /app
+    command: sh -c "npm install --omit=dev && node server.js"
+    volumes: ["./quickbite:/app"]
+    ports: ["4100:4100"]
+volumes:
+  mongo-data:
+  storage:

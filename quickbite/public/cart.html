@@ -1,0 +1,27 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Your cart · QuickBite</title>
+<link rel="stylesheet" href="/css/styles.css">
+<script src="/js/config.js"></script>
+<script src="/js/common.js"></script>
+</head>
+<body>
+<main>
+<h1>Your cart</h1>
+<div class="card">
+  <p id="cart-empty" class="muted hidden">Your cart is empty. <a href="/menu">Browse the menu</a>.</p>
+  <table class="cart" id="cart-table">
+    <thead><tr><th>Item</th><th>Price</th><th>Quantity</th><th>Subtotal</th></tr></thead>
+    <tbody id="cart-rows"></tbody>
+  </table>
+  <div class="cart-summary"><span>Total:</span> <strong id="cart-total" data-testid="cart-total">$0.00</strong></div>
+  <div style="text-align:right;margin-top:12px"><a class="btn btn-primary" href="/checkout">Go to checkout</a></div>
+</div>
+</main>
+<script>renderHeader('cart');</script>
+<script src="/js/cart.js"></script>
+</body>
+</html>

@@ -1,0 +1,200 @@
+{
+  "openapi": "3.0.3",
+  "info": {
+    "title": "QuickBite API",
+    "version": "1.0.0"
+  },
+  "paths": {
+    "/api/login": {
+      "post": {
+        "summary": "Sign in a customer",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": [
+                  "email",
+                  "password"
+                ],
+                "properties": {
+                  "email": {
+                    "type": "string",
+                    "format": "email",
+                    "example": "demo@quickbite.test"
+                  },
+                  "password": {
+                    "type": "string",
+                    "example": "quickbite123"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Signed in"
+          },
+          "400": {
+            "description": "Invalid input"
+          },
+          "401": {
+            "description": "Invalid credentials"
+          }
+        }
+      }
+    },
+    "/api/menu": {
+      "get": {
+        "summary": "List menu items",
+        "responses": {
+          "200": {
+            "description": "Menu",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "items"
+                  ],
+                  "properties": {
+                    "items": {
+                      "type": "array"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/menu/{id}": {
+      "get": {
+        "summary": "Get a menu item",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "example": "m1"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Item"
+          },
+          "404": {
+            "description": "Not found"
+          }
+        }
+      }
+    },
+    "/api/orders": {
+      "post": {
+        "summary": "Place an order",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": [
+                  "customer",
+                  "items"
+                ],
+                "properties": {
+                  "customer": {
+                    "type": "object",
+                    "required": [
+                      "name",
+                      "email",
+                      "phone",
+                      "address"
+                    ],
+                    "properties": {
+                      "name": {
+                        "type": "string",
+                        "example": "Asha Rao"
+                      },
+                      "email": {
+                        "type": "string",
+                        "format": "email",
+                        "example": "asha@example.com"
+                      },
+                      "phone": {
+                        "type": "string",
+                        "example": "+1 555 010 2020"
+                      },
+                      "address": {
+                        "type": "string",
+                        "example": "12 Market Street"
+                      }
+                    }
+                  },
+                  "items": {
+                    "type": "array",
+                    "items": {
+                      "type": "object",
+                      "required": [
+                        "id",
+                        "quantity"
+                      ],
+                      "properties": {
+                        "id": {
+                          "type": "string",
+                          "example": "m1"
+                        },
+                        "quantity": {
+                          "type": "integer",
+                          "minimum": 1,
+                          "example": 2
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Order created"
+          },
+          "400": {
+            "description": "Validation failed"
+          }
+        }
+      }
+    },
+    "/api/orders/{id}": {
+      "get": {
+        "summary": "Get an order confirmation",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Order"
+          },
+          "404": {
+            "description": "Not found"
+          }
+        }
+      }
+    }
+  }
+}

@@ -1,0 +1,59 @@
+@import "tailwindcss";
+
+@theme {
+  --font-sans: "Inter", ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
+  --font-mono: "JetBrains Mono", ui-monospace, SFMono-Regular, Menlo, monospace;
+  --color-ink-950: #080b11;
+  --color-ink-900: #0d1119;
+  --color-ink-850: #111722;
+  --color-ink-800: #161d2a;
+  --color-ink-700: #212a3a;
+  --color-ink-600: #2e384b;
+  --color-ink-400: #7d879c;
+  --color-ink-300: #a3acbf;
+  --color-ink-100: #e6e9f0;
+  --color-accent-300: #7eead9;
+  --color-accent-400: #2dd4bf;
+  --color-accent-500: #14b8a6;
+  --color-accent-600: #0d9488;
+}
+
+html,
+body,
+#root {
+  min-height: 100%;
+}
+
+body {
+  @apply bg-ink-950 text-ink-100 font-sans antialiased;
+}
+
+::selection {
+  background: rgb(45 212 191 / 0.3);
+}
+
+.scroll-thin::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+.scroll-thin::-webkit-scrollbar-thumb {
+  background: #2e384b;
+  border-radius: 8px;
+}
+
+.grid-bg {
+  background-image: linear-gradient(rgb(255 255 255 / 0.035) 1px, transparent 1px), linear-gradient(90deg, rgb(255 255 255 / 0.035) 1px, transparent 1px);
+  background-size: 32px 32px;
+}
+
+@keyframes pulse-ring {
+  0% { box-shadow: 0 0 0 0 rgb(45 212 191 / 0.5); }
+  100% { box-shadow: 0 0 0 10px rgb(45 212 191 / 0); }
+}
+.pulse-ring {
+  animation: pulse-ring 1.4s ease-out infinite;
+}
+
+input, select, textarea {
+  color-scheme: dark;
+}

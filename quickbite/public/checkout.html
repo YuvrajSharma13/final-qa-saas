@@ -1,0 +1,37 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Checkout · QuickBite</title>
+<link rel="stylesheet" href="/css/styles.css">
+<script src="/js/config.js"></script>
+<script src="/js/common.js"></script>
+</head>
+<body>
+<main>
+<h1>Checkout</h1>
+<div class="checkout-layout">
+  <div class="checkout-card">
+    <div id="checkout-error" class="alert alert-error hidden" role="alert"></div>
+    <form id="checkout-form">
+      <div class="form-row"><label for="name">Full name</label><input id="name" name="name" required autocomplete="name"></div>
+      <div class="form-row"><label for="c-email">Email</label><input id="c-email" name="email" type="email" required autocomplete="email"></div>
+      <div class="form-row"><label for="phone">Phone</label><input id="phone" name="phone" type="tel" required autocomplete="tel"></div>
+      <div class="form-row"><label for="address">Delivery address</label><textarea id="address" name="address" rows="2" required></textarea></div>
+      <div class="checkout-actions">
+        <button type="submit" class="btn place-order-btn" id="place-order">Place order</button>
+      </div>
+    </form>
+  </div>
+  <aside class="card" aria-label="Order summary">
+    <h2 style="margin-top:0">Summary</h2>
+    <ul id="summary-items" class="muted"></ul>
+    <p>Total: <strong id="summary-total">$0.00</strong></p>
+  </aside>
+</div>
+</main>
+<script>renderHeader('checkout');</script>
+<script src="/js/checkout.js"></script>
+</body>
+</html>

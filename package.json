@@ -1,0 +1,17 @@
+{
+  "name": "ai-qa-saas",
+  "private": true,
+  "description": "AI QA SaaS — multi-agent functional, API and computer-vision QA for small development teams (with the QuickBite demo app).",
+  "scripts": {
+    "setup": "npm --prefix server install && npm --prefix web install && npm --prefix quickbite install && npm --prefix server exec -- playwright-core install chromium",
+    "build": "npm --prefix web run build",
+    "start": "npm --prefix server start",
+    "dev:api": "npm --prefix server run dev",
+    "dev:web": "npm --prefix web run dev",
+    "demo:app": "npm --prefix quickbite start",
+    "typecheck": "npm --prefix server run typecheck && npm --prefix web run typecheck",
+    "test": "npm --prefix server test",
+    "test:acceptance": "npm --prefix server run test:acceptance",
+    "test:ui": "node server/test/e2e-ui/ui-walkthrough.mjs"
+  }
+}
