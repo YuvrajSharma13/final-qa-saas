@@ -17,6 +17,13 @@ services:
       DEMO_APP_URL: http://quickbite:4100/
       DEMO_REPO_PATH: /quickbite
       ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY:-}
+      # GitHub auto-fix (see README → GitHub auto-fix). Users can also connect a fine-grained token instead of OAuth.
+      GITHUB_CLIENT_ID: ${GITHUB_CLIENT_ID:-}
+      GITHUB_CLIENT_SECRET: ${GITHUB_CLIENT_SECRET:-}
+      GITHUB_OAUTH_CALLBACK_URL: ${GITHUB_OAUTH_CALLBACK_URL:-http://localhost:4000/api/github/oauth/callback}
+      AUTOFIX_ENABLED: ${AUTOFIX_ENABLED:-true}
+      AUTOFIX_MAX_ATTEMPTS: ${AUTOFIX_MAX_ATTEMPTS:-3}
+      AUTOFIX_RUN_VALIDATION: ${AUTOFIX_RUN_VALIDATION:-true}
     volumes:
       - storage:/data/storage
       - ./quickbite:/quickbite:ro

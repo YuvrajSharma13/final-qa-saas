@@ -1,7 +1,9 @@
 import { useState, type FormEvent } from 'react';
 import { Navigate, useSearchParams } from 'react-router-dom';
 import { Logo } from '../components/Layout';
+import { Icon } from '../components/icons';
 import { Button, ErrorBox, Field, Input, Tabs } from '../components/ui';
+import { useApi } from '../lib/api';
 import { useAuth } from '../lib/auth';
 
 export default function Login() {
@@ -12,6 +14,8 @@ export default function Login() {
   const [error, setError] = useState<Error | null>(null);
   const [busy, setBusy] = useState(false);
   const [target, setTarget] = useState(params.get('next') || '/dashboard');
+  const { data: gh } = useApi<{ oauthConfigured: boolean }>('/github/config');
+  const ghError = params.get('githubError');
 
   // After sign-up the auth context updates first; this redirect then sends new users to project setup.
   if (user) return <Navigate to={target} replace />;
@@ -51,7 +55,7 @@ export default function Login() {
             }}
           />
           <form onSubmit={submit} className="mt-5 space-y-4" noValidate>
-            <ErrorBox error={error} />
+            <ErrorBox error={error || (ghError ? { message: `GitHub sign-in: ${ghError}` } : null)} />
             {mode === 'register' && (
               <>
                 <Field label="Your name" htmlFor="name">
@@ -72,6 +76,19 @@ export default function Login() {
               {mode === 'login' ? 'Sign in' : 'Create account'}
             </Button>
           </form>
+          {gh?.oauthConfigured && (
+            <>
+              <div className="my-5 flex items-center gap-3 text-xs text-ink-400">
+                <span className="h-px flex-1 bg-ink-700" /> or <span className="h-px flex-1 bg-ink-700" />
+              </div>
+              <a
+                href={`/api/github/oauth/start?mode=login&next=${encodeURIComponent(target)}`}
+                className="flex w-full items-center justify-center gap-2 rounded-lg bg-ink-100 px-3.5 py-2 text-sm font-semibold text-ink-950 hover:bg-white"
+              >
+                <Icon name="github" /> Continue with GitHub
+              </a>
+            </>
+          )}
         </div>
       </div>
     </div>

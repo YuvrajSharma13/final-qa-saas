@@ -107,6 +107,7 @@ export interface Project {
     notifyOnCritical?: boolean;
     hasTestPassword?: boolean;
     hasGithubToken?: boolean;
+    github?: GithubLink | null;
   };
 }
 
@@ -269,4 +270,121 @@ export interface RegressionTest {
   results?: { at: string; status: string; detail: string; runId?: string }[];
 }
 
-export const shotUrl = (id: string, annotated = false) => `/api/screenshots/${id}/image${annotated ? '?variant=annotated' : ''}`;
+export interface GithubLink {
+  owner: string;
+  repo: string;
+  baseBranch: string;
+  defaultBranch?: string;
+  private?: boolean;
+  linkedAt?: string;
+}
+
+export interface GithubConnection {
+  connected: boolean;
+  login?: string;
+  name?: string;
+  email?: string;
+  avatarUrl?: string;
+  method?: 'oauth' | 'token';
+  scopes?: string[];
+  connectedAt?: string;
+  lastUsedAt?: string;
+  lastError?: string;
+}
+
+export interface ValidationCheck {
+  name: string;
+  kind: string;
+  command: string;
+  status: 'passed' | 'failed' | 'skipped' | 'timeout';
+  exitCode?: number;
+  durationMs?: number;
+  failures?: number | null;
+  output?: string;
+  note?: string;
+}
+
+export interface ValidationReport {
+  phase: string;
+  checks: ValidationCheck[];
+  passed: boolean;
+  summary: string;
+  durationMs: number;
+  verdict?: { ok: boolean; problems: string[]; preExisting: string[] };
+}
+
+export interface FixAttempt {
+  n: number;
+  engine: 'llm' | 'rules';
+  explanation: string;
+  files: { path: string; before: string; after: string; additions: number; deletions: number }[];
+  diff: string;
+  patchHash: string;
+  feedback?: string;
+  validation?: ValidationReport;
+  status: 'proposed' | 'approved' | 'rejected' | 'validation_failed';
+  error?: string;
+  createdAt: string;
+  approvedAt?: string;
+  approvedByName?: string;
+}
+
+export type AutoFixStatus =
+  | 'queued'
+  | 'generating'
+  | 'awaiting_approval'
+  | 'applying'
+  | 'validating'
+  | 'committing'
+  | 'pushing'
+  | 'creating_pr'
+  | 'pr_open'
+  | 'merged'
+  | 'closed'
+  | 'rejected'
+  | 'failed'
+  | 'canceled';
+
+export interface PullInfo {
+  number: number;
+  url: string;
+  state: string;
+  merged: boolean;
+  draft?: boolean;
+  mergeable?: boolean | null;
+  title?: string;
+  updatedAt?: string;
+  checks?: { state: string; total: number; passed: number; failed: number; pending: number; runs: { name: string; status: string; conclusion: string | null; url: string }[] };
+}
+
+export interface AutoFix {
+  _id: string;
+  bugId: string;
+  projectId: string;
+  status: AutoFixStatus;
+  repo: { owner: string; name: string; baseBranch: string; baseSha?: string; defaultBranch?: string };
+  branch?: string;
+  commitSha?: string;
+  attempts: FixAttempt[];
+  attemptsCount?: number;
+  baseline?: ValidationReport;
+  pr?: PullInfo;
+  events: { ts: string; level: string; step: string; message: string }[];
+  error?: string;
+  createdAt: string;
+  updatedAt: string;
+  createdByName?: string;
+  bug?: { _id: string; title: string; severity: Severity; category: string; status: string; expected?: string; actual?: string };
+  bugTitle?: string;
+  bugSeverity?: Severity;
+  project?: { _id: string; name: string };
+  projectName?: string;
+  maxAttempts?: number;
+  repoUrl?: string;
+  branchUrl?: string;
+  commitUrl?: string;
+}
+
+export const FIX_ACTIVE: AutoFixStatus[] = ['queued', 'generating', 'applying', 'validating', 'committing', 'pushing', 'creating_pr'];
+
+export const shotUrl =(id: string, annotated = false) => `/api/screenshots/${id}/image${annotated ? '?variant=annotated' : ''}`;

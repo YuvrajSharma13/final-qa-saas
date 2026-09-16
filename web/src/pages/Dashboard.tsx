@@ -3,7 +3,8 @@ import { Link } from 'react-router-dom';
 import { RunBars, ScoreLine, SeverityBars, type TrendPoint } from '../components/charts';
 import { Icon } from '../components/icons';
 import { Card, Empty, ErrorBox, LinkButton, PageHeader, PageLoader, ScoreRing, Select, Stat, StatusBadge } from '../components/ui';
-import { useApi, type RunSummary, type Severity } from '../lib/api';
+import { FixList, RepoBadge } from '../components/github';
+import { useApi, type AutoFix, type GithubConnection, type RunSummary, type Severity } from '../lib/api';
 import { useAuth } from '../lib/auth';
 import { duration, timeAgo } from '../lib/format';
 
@@ -24,6 +25,66 @@ interface DashboardData {
   projects: { id: string; name: string; appUrl: string; openBugs: number; critical: number; lastRun?: { runId?: string; status?: string; qaScore?: number; at?: string } }[];
   plan: { id: string; name: string; runsPerMonth: number; maxProjects: number };
   usage: { runs: number; projects: number; periodEnd: string };
+  github: {
+    connection: GithubConnection;
+    repositories: { projectId: string; projectName: string; owner: string; repo: string; baseBranch: string }[];
+    fixes: AutoFix[];
+    counts: { awaitingApproval: number; inProgress: number; openPrs: number; merged: number; failed: number };
+  };
+}
+
+function GithubPanel({ gh }: { gh: DashboardData['github'] }) {
+  const c = gh.connection;
+  return (
+    <Card
+      title={<span className="inline-flex items-center gap-2"><Icon name="github" /> GitHub & AI fixes</span>}
+      subtitle={c.connected ? `Connected as @${c.login}` : 'Not connected'}
+      actions={<LinkButton to={c.connected ? '/fixes' : '/settings?tab=github'} variant="ghost">{c.connected ? 'All AI fixes →' : 'Connect GitHub →'}</LinkButton>}
+      padded={false}
+    >
+      <div className="grid gap-0 lg:grid-cols-[280px_1fr]">
+        <div className="space-y-4 border-b border-ink-700 p-4 lg:border-b-0 lg:border-r">
+          <div className="grid grid-cols-2 gap-2 text-center">
+            {(
+              [
+                ['Awaiting review', gh.counts.awaitingApproval, 'text-amber-200'],
+                ['In progress', gh.counts.inProgress, 'text-accent-300'],
+                ['Open PRs', gh.counts.openPrs, 'text-emerald-300'],
+                ['Merged', gh.counts.merged, 'text-violet-300'],
+              ] as const
+            ).map(([label, v, tone]) => (
+              <div key={label} className="rounded-lg border border-ink-700 bg-ink-850 p-2">
+                <div className={`text-xl font-semibold tabular-nums ${v ? tone : ''}`}>{v}</div>
+                <div className="text-[11px] text-ink-400">{label}</div>
+              </div>
+            ))}
+          </div>
+          <div>
+            <div className="mb-1.5 text-xs text-ink-400">Linked repositories</div>
+            {gh.repositories.length ? (
+              <ul className="space-y-1.5">
+                {gh.repositories.map((r) => (
+                  <li key={r.projectId} className="flex flex-col">
+                    <Link to={`/projects/${r.projectId}`} className="text-sm hover:text-accent-300">
+                      {r.projectName}
+                    </Link>
+                    <RepoBadge owner={r.owner} repo={r.repo} branch={r.baseBranch} />
+                  </li>
+                ))}
+              </ul>
+            ) : (
+              <p className="text-sm text-ink-400">
+                No repository linked. <Link to="/settings?tab=github" className="text-accent-300 hover:underline">Link one</Link>
+              </p>
+            )}
+          </div>
+        </div>
+        <div className="min-w-0">
+          <FixList fixes={gh.fixes} empty="No AI fixes yet — open a bug and choose “Generate AI fix”." />
+        </div>
+      </div>
+    </Card>
+  );
 }
 
 const TREND: Record<string, { label: string; tone: 'good' | 'bad' | undefined; hint: string }> = {
@@ -142,6 +203,8 @@ export default function Dashboard() {
               </div>
             </Card>
           </div>
+
+          {data.github && <GithubPanel gh={data.github} />}
 
           <div className="grid gap-6 lg:grid-cols-2">
             <Card title="Checks per run" subtitle="Passed vs failed">

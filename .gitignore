@@ -5,3 +5,4 @@ storage-test/
 .env
 *.tsbuildinfo
 ui-shots/
+.autofix-work/

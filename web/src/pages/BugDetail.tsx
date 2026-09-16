@@ -3,13 +3,14 @@ import { Link, useParams } from 'react-router-dom';
 import { Icon } from '../components/icons';
 import { ScreenshotCard, ScreenshotModal } from '../components/ScreenshotViewer';
 import { Badge, Button, Card, CategoryBadge, CodeBlock, ErrorBox, PageHeader, PageLoader, Select, SeverityBadge, StatusBadge } from '../components/ui';
-import { api, useApi, type Bug, type RegressionTest, type Screenshot, type TestCase } from '../lib/api';
+import { api, useApi, type Bug, type GithubLink, type RegressionTest, type Screenshot, type TestCase } from '../lib/api';
+import { AutoFixCard } from '../components/AutoFixCard';
 import { useAuth } from '../lib/auth';
 import { dateTime, timeAgo } from '../lib/format';
 
 interface BugData {
   bug: Bug;
-  project: { _id: string; name: string; appUrl: string; repoUrl?: string } | null;
+  project: { _id: string; name: string; appUrl: string; repoUrl?: string; settings?: { github?: GithubLink | null } } | null;
   regressionTests: RegressionTest[];
   screenshots: Screenshot[];
   testCases: TestCase[];
@@ -216,6 +217,7 @@ export default function BugDetail() {
         </div>
 
         <div className="min-w-0 space-y-6">
+          <AutoFixCard bug={bug} project={project} />
           <Card
             title="Regression test"
             subtitle="Executed automatically on every QA run"

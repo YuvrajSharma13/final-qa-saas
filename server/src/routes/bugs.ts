@@ -35,7 +35,7 @@ bugsRouter.get(
     const bug = await loadBug(req.user!.id, req.params.id);
     const ev = (bug.evidence || {}) as { screenshotIds?: string[]; testCaseIds?: string[] };
     const [project, regressionTests, screenshots, testCases] = await Promise.all([
-      Project.findById(bug.projectId, { name: 1, appUrl: 1, repoUrl: 1 }).lean(),
+      Project.findById(bug.projectId, { name: 1, appUrl: 1, repoUrl: 1, 'settings.github': 1 }).lean(),
       RegressionTest.find({ bugId: bug._id }).sort({ createdAt: -1 }).lean(),
       Screenshot.find({ _id: { $in: (ev.screenshotIds || []).map((i) => objectId(String(i))) } }).lean(),
       TestCase.find({ _id: { $in: (ev.testCaseIds || []).map((i) => objectId(String(i))) } }).lean(),

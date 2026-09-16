@@ -1,7 +1,9 @@
 import { useEffect, useState, type ReactNode } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { Badge, Button, Card, cx, Empty, ErrorBox, Field, Input, LinkButton, PageHeader, PageLoader, Select, Toggle } from '../components/ui';
-import { api, shotUrl, useApi, type Project, type Screenshot } from '../lib/api';
+import { GithubConnectionPanel, RepoLinker } from '../components/github';
+import { Icon } from '../components/icons';
+import { api, shotUrl, useApi, type GithubConnection, type Project, type Screenshot } from '../lib/api';
 import { useAuth } from '../lib/auth';
 
 function Saved({ msg }: { msg: string }) {
@@ -86,8 +88,8 @@ function ProjectSettings({ project, onChange }: { project: Project; onChange: ()
       </Section>
 
       <Section
-        title="GitHub & API configuration"
-        subtitle="Tokens are write-only: they are encrypted at rest and never returned to the browser."
+        title="API & repository configuration"
+        subtitle="To pick a repository/branch and enable AI fix PRs, use the GitHub tab. Tokens here are write-only and encrypted at rest."
         footer={
           editable && (
             <>
@@ -394,13 +396,64 @@ function WorkspaceSettings() {
   );
 }
 
+function GithubSettings({ projects, projectId, project, onProject, onLinked }: { projects: Project[]; projectId: string; project?: Project; onProject: (id: string) => void; onLinked: () => void }) {
+  const { data, reload } = useApi<{ connection: GithubConnection }>('/github/status');
+  const connected = Boolean(data?.connection.connected);
+  return (
+    <div className="space-y-6">
+      <Section title="GitHub account" subtitle="Used to list repositories, create ai-fix branches, push approved commits and open pull requests. The token is encrypted server-side and never sent to the browser.">
+        <GithubConnectionPanel onChange={reload} />
+      </Section>
+      <Section title="Repository & branch" subtitle="Pick the repository and the base branch that AI fix pull requests should target. Code Analysis also reads this branch.">
+        {projects.length ? (
+          <>
+            <div className="max-w-xs">
+              <Field label="Project" htmlFor="gh-proj">
+                <Select id="gh-proj" value={projectId} onChange={(e) => onProject(e.target.value)}>
+                  {projects.map((p) => (
+                    <option key={p.id} value={p.id}>
+                      {p.name}
+                    </option>
+                  ))}
+                </Select>
+              </Field>
+            </div>
+            {project ? <RepoLinker key={project.id} project={project} connected={connected} onLinked={onLinked} /> : <PageLoader />}
+          </>
+        ) : (
+          <Empty title="Create a project first" icon="folder" />
+        )}
+      </Section>
+      <Section title="Safety rules" subtitle="Enforced server-side for every AI fix">
+        <ul className="grid gap-2 text-sm text-ink-300 sm:grid-cols-2">
+          {[
+            'Only ai-fix/* branches are ever pushed — never main, master or the base branch',
+            'You see the exact diff (sha256-pinned) before anything is applied',
+            'Commit & push happen only after your explicit approval',
+            'Only existing files are edited; lockfiles, CI config and secrets are off-limits',
+            'Tests, lint and build run before the PR; failures go back to the AI and need re-approval',
+            'Validation runs with a scrubbed environment — no tokens or API keys',
+          ].map((t) => (
+            <li key={t} className="flex gap-2">
+              <Icon name="shield" className="mt-0.5 shrink-0 text-accent-300" />
+              {t}
+            </li>
+          ))}
+        </ul>
+      </Section>
+    </div>
+  );
+}
+
 export default function Settings() {
   const [params, setParams] = useSearchParams();
   const { workspace } = useAuth();
   const { data, error, loading } = useApi<{ projects: Project[] }>(`/projects?ws=${workspace?.id}`);
   const projectId = params.get('project') || data?.projects[0]?.id || '';
   const tab = params.get('tab') || 'project';
-  const { data: pd, reload } = useApi<{ project: Project }>(projectId && tab === 'project' ? `/projects/${projectId}` : null);
+  const { data: pd, reload } = useApi<{ project: Project }>(projectId && (tab === 'project' || tab === 'github') ? `/projects/${projectId}` : null);
+  const ghError = params.get('githubError');
+  const ghConnected = params.get('github') === 'connected';
 
   return (
     <div className="mx-auto max-w-4xl">
@@ -411,6 +464,7 @@ export default function Settings() {
           <div className="flex rounded-lg border border-ink-600 p-0.5 text-sm">
             {[
               ['project', 'Project'],
+              ['github', 'GitHub'],
               ['workspace', 'Workspace & team'],
             ].map(([id, label]) => (
               <button key={id} onClick={() => setParams({ tab: id, ...(projectId ? { project: projectId } : {}) })} className={cx('rounded-md px-3 py-1.5', tab === id ? 'bg-ink-700' : 'text-ink-300')}>
@@ -420,9 +474,16 @@ export default function Settings() {
           </div>
         }
       />
-      <ErrorBox error={error} />
+      <ErrorBox error={error || (ghError ? { message: `GitHub: ${ghError}` } : null)} />
+      {ghConnected && (
+        <div role="status" className="mb-4 rounded-lg border border-emerald-500/30 bg-emerald-500/10 px-3 py-2 text-sm text-emerald-200">
+          GitHub account connected.
+        </div>
+      )}
       {tab === 'workspace' ? (
         <WorkspaceSettings />
+      ) : tab === 'github' ? (
+        <GithubSettings projects={data?.projects || []} projectId={projectId} project={pd?.project} onProject={(id) => setParams({ tab: 'github', project: id })} onLinked={reload} />
       ) : loading ? (
         <PageLoader />
       ) : !data?.projects.length ? (

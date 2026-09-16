@@ -107,7 +107,7 @@ try {
   await page.waitForTimeout(500);
   await shot('12-dashboard', true);
   await page.goto(BASE + '/settings');
-  await expectText(/GitHub & API configuration/);
+  await expectText(/API & repository configuration/);
   await shot('13-settings', true);
 
   step('mobile layout');

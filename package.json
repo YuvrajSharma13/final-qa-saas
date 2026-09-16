@@ -12,6 +12,8 @@
     "typecheck": "npm --prefix server run typecheck && npm --prefix web run typecheck",
     "test": "npm --prefix server test",
     "test:acceptance": "npm --prefix server run test:acceptance",
-    "test:ui": "node server/test/e2e-ui/ui-walkthrough.mjs"
+    "test:ui": "node server/test/e2e-ui/ui-walkthrough.mjs",
+    "test:ui:github": "npm --prefix server exec -- tsx test/e2e-ui/github-autofix-ui.ts",
+    "test:github-live": "npm --prefix server run test:github-live --"
   }
 }

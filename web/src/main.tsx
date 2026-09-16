@@ -8,6 +8,8 @@ import { AuthProvider, useAuth } from './lib/auth';
 import Billing from './pages/Billing';
 import BugDetail from './pages/BugDetail';
 import Bugs from './pages/Bugs';
+import FixDetail from './pages/FixDetail';
+import Fixes from './pages/Fixes';
 import Dashboard from './pages/Dashboard';
 import Landing from './pages/Landing';
 import Login from './pages/Login';
@@ -72,6 +74,8 @@ createRoot(document.getElementById('root')!).render(
               <Route path="/runs/:id" element={<RunView />} />
               <Route path="/bugs" element={<Bugs />} />
               <Route path="/bugs/:id" element={<BugDetail />} />
+              <Route path="/fixes" element={<Fixes />} />
+              <Route path="/fixes/:id" element={<FixDetail />} />
               <Route path="/settings" element={<Settings />} />
               <Route path="/billing" element={<Billing />} />
               <Route path="*" element={<NotFound />} />

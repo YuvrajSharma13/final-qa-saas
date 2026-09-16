@@ -70,7 +70,7 @@ Each agent has its own input, output and `agentRuns` record. You can open any of
 
 ### Pages
 
-`/` landing · `/login` · `/dashboard` · `/projects` · `/projects/new` · `/projects/:id` · `/projects/:id/run` · `/runs/:id` · `/bugs` · `/bugs/:id` · `/settings` · `/billing`
+`/` landing · `/login` · `/dashboard` · `/projects` · `/projects/new` · `/projects/:id` · `/projects/:id/run` · `/runs/:id` · `/bugs` · `/bugs/:id` · `/fixes` · `/fixes/:id` · `/settings` · `/billing`
 
 ### API
 
@@ -82,13 +82,16 @@ Each agent has its own input, output and `agentRuns` record. You can open any of
 | `GET /api/projects/:id/bugs` · `GET /api/bugs` · `GET/PATCH /api/bugs/:id` · `POST /api/bugs/:id/regression[?run=1]` | Bugs & regression tests |
 | `GET /api/projects/:id/regression-tests` · `POST /api/projects/:id/references` · `POST /api/screenshots/:id/baseline` · `GET /api/screenshots/:id/image` | Tests & visual evidence |
 | `GET /api/dashboard` · `GET /api/billing` · `POST /api/billing/plan` · `GET/PATCH /api/workspaces/current` · `…/members` · `GET /api/notifications` | SaaS |
+| `GET /api/github/config` · `GET /api/github/oauth/start` · `GET /api/github/oauth/callback` · `GET /api/github/status` · `POST /api/github/token` · `DELETE /api/github/connection` | GitHub connection (OAuth or token) |
+| `GET /api/github/repos?q=` · `GET /api/github/repos/:owner/:repo/branches` · `PUT/GET/DELETE /api/github/projects/:id/repository` | Repository & branch selection |
+| `POST /api/autofixes` · `GET /api/autofixes` · `GET /api/autofixes/:id` · `POST /api/autofixes/:id/approve·reject·retry·cancel·refresh` | AI auto-fix → pull request |
 | `POST /api/agents/plan` · `POST /api/agents/vision` · `GET /api/agents/queue` | Internal (server-side token only) |
 
-MongoDB collections match the spec: `users, workspaces, members, projects, testRuns, testCases, bugs, agentRuns, screenshots, regressionTests`, plus `notifications`.
+MongoDB collections match the spec: `users, workspaces, members, projects, testRuns, testCases, bugs, agentRuns, screenshots, regressionTests`, plus `notifications`, `githubConnections` and `autoFixes`.
 
 ## Running it locally
 
-Requirements: Node.js 20 or newer, MongoDB 6 or newer, and Chromium (installed by the setup script).
+Requirements: Node.js 20 or newer, MongoDB 6 or newer, `git` on the PATH (for AI auto-fix), and Chromium (installed by the setup script).
 
 ```bash
 npm run setup                     # installs server, web, quickbite and Playwright Chromium
@@ -126,12 +129,99 @@ QuickBite's intentional bugs:
 | Mobile checkout | "Place order" button clipped at 375px (and at 768px) |
 | Order confirmation | Fails for names that contain `"` |
 
+## GitHub auto-fix → pull request
+
+The flow is: **GitHub login → select repository → select branch → detect bug → AI generates fix → before/after diff → you approve → `ai-fix/*` branch → minimal patch → tests/lint/build → commit → push → pull request.**
+Everything talks to the real GitHub REST API and real `git`. Nothing is simulated.
+
+### 1. Connect GitHub (choose one)
+
+**OAuth App (recommended).**
+
+1. On github.com, go to *Settings → Developer settings → OAuth Apps → New OAuth App*.
+2. Fill in the app:
+   - Homepage URL: `http://localhost:4000`
+   - Authorization callback URL: `http://localhost:4000/api/github/oauth/callback`
+3. Put the client id and secret in `server/.env` (or in your shell environment for Docker):
+
+   ```
+   GITHUB_CLIENT_ID=Ov23li...
+   GITHUB_CLIENT_SECRET=...
+   GITHUB_OAUTH_CALLBACK_URL=http://localhost:4000/api/github/oauth/callback
+   ```
+
+4. Restart the API. The login page now shows **Continue with GitHub**, and *Settings → GitHub* shows **Connect with GitHub**.
+   - "Continue with GitHub" signs you in, or creates your account, using your verified primary GitHub email.
+
+**Fine-grained personal access token.** No OAuth App is needed.
+
+1. On github.com, go to *Settings → Developer settings → Fine-grained tokens*.
+2. Select the repositories you want to fix.
+3. Grant **Contents: Read and write** and **Pull requests: Read and write**. Metadata read access is added automatically.
+4. Paste the token into *Settings → GitHub*.
+
+In both cases the token is encrypted (AES-256-GCM, `APP_ENCRYPTION_KEY`) in `githubConnections`. The API never returns it, and it never reaches the browser or the logs.
+
+### 2. Use it
+
+1. **Link a repository.** Go to *Settings → GitHub*, pick the project, the repository and the **base branch**, then click **Link repository**.
+   - Code Analysis now reads that branch through the GitHub API.
+2. **Find bugs.** Run AI QA. Repository analysis needs the Pro or Team plan; in test mode you can switch plans on *Billing*.
+3. **Generate a fix.** Open a bug and click **Generate AI fix**.
+   - The server clones the base branch into `AUTOFIX_WORK_DIR` and records the baseline checks.
+   - The AI proposes minimal find/replace edits.
+   - You see the exact **Before / After** diff (or the unified diff) with its sha256.
+4. **Approve.** Tick *I reviewed this exact diff* and click **Approve**. The server then:
+   - creates `ai-fix/<bug>-<id>` from the base commit;
+   - applies exactly the approved patch (`git apply --check`, then a byte-for-byte comparison);
+   - runs install (`--ignore-scripts`), lint, typecheck, test and build (whichever scripts exist), plus syntax checks on the changed files;
+   - if the checks pass: commits only the patched files (authored by you), pushes the `ai-fix/*` branch, and opens a PR with a report of the changes and checks.
+5. **If validation fails,** the failing output goes back to the AI. It proposes a new attempt, which you must approve again, up to `AUTOFIX_MAX_ATTEMPTS` (default 3). You can also **Reject & regenerate** with feedback.
+6. **Track the PRs.** The dashboard's **GitHub & AI fixes** panel, the project page and *AI fixes* show the repository, branch, attempt, check results and PR state (open, merged or closed).
+
+### Safety rules enforced on the server
+
+- **Branches:**
+  - Pushes go only to new `ai-fix/*` branches, using an explicit refspec and never `--force`.
+  - The base branch, `main`, `master` and the repository's default branch are refused.
+- **Approval:**
+  - Nothing is committed or pushed without an approval tied to the attempt number and the diff's sha256.
+  - A new attempt always needs a new approval.
+- **Patch scope:**
+  - Only existing files may be edited, and each edit must match exactly once.
+  - Size limits apply.
+  - `.git`, `.github/workflows`, `node_modules`, `.env*`, lockfiles, keys and binaries are never touched.
+  - The commit contains only the approved paths.
+- **Git process:**
+  - Git runs with a scrubbed environment, with no hooks, credential helpers or signing prompts.
+  - The token is passed per command as an HTTP header, never written into the remote URL or `.git/config`.
+- **Pre-existing failures:** a check that already failed on the base branch doesn't block the PR unless the change makes it worse. The PR body lists those checks.
+- **Isolation:** validation runs the repository's own scripts. In production, run the API in an isolated container or VM, or set `AUTOFIX_RUN_VALIDATION=false` to skip the checks (the PR then says so).
+- **AI engine:** with `ANTHROPIC_API_KEY` set, fixes come from Claude. Without it, a rule-based engine built on the Code Analysis findings produces the patch.
+
+### Testing the GitHub flow
+
+- `npm run test:acceptance` includes `github-autofix.acceptance.test.ts`. It runs the whole OAuth → repo → QA → fix → approval → failed validation → retry → push → PR → merge flow. The GitHub side is a local GitHub-compatible server: real `git http-backend` over bare repositories, plus the REST endpoints used. The product code runs unchanged, pointed there through `GITHUB_API_URL`/`GITHUB_WEB_URL`.
+- `npm run test:ui:github` is the same flow in a real browser.
+- `npm run test:github-live` runs the flow against **real github.com** with your token and a throwaway repository that contains the `quickbite` folder:
+
+  ```bash
+  # macOS/Linux
+  GITHUB_TOKEN=github_pat_... GITHUB_TEST_REPO=you/quickbite-ai-qa-test npm run test:github-live
+  # Windows PowerShell
+  $env:GITHUB_TOKEN="github_pat_..."; $env:GITHUB_TEST_REPO="you/quickbite-ai-qa-test"; npm run test:github-live
+  ```
+
+  The script prints each diff and asks for your approval (add `-- --yes` to auto-approve). It finishes by opening a real PR on your repository.
+
 ## Tests
 
 ```bash
 npm test                  # unit tests: planner, analyzer, code analysis on QuickBite, CV primitives, security helpers
 npm run test:acceptance   # full end-to-end acceptance test against QuickBite (needs MongoDB + Chromium, ~2 min)
 npm run test:ui           # browser walkthrough of the SaaS UI (needs the API on :4000 and QuickBite on :4100)
+npm run test:ui:github    # browser walkthrough of GitHub login → fix → approval → PR (needs MongoDB + Chromium)
+npm run test:github-live  # the same flow against real github.com (see above)
 ```
 
 The acceptance test (`server/test/acceptance/quickbite.acceptance.test.ts`) follows the spec's end-to-end demo:
@@ -154,10 +244,11 @@ See `server/.env.example`. The most important settings:
 - **Storage:** `S3_*` switches evidence storage to any S3-compatible bucket.
 - **Email:** `SMTP_URL` enables notification emails.
 - **AI:** `ANTHROPIC_API_KEY` and `ANTHROPIC_MODEL` turn on the optional model.
+- **GitHub:** `GITHUB_CLIENT_ID`/`GITHUB_CLIENT_SECRET`/`GITHUB_OAUTH_CALLBACK_URL` enable OAuth. `GITHUB_API_URL`/`GITHUB_WEB_URL` point to GitHub Enterprise. `AUTOFIX_*` controls the fix engine.
 
 ## Roadmap (from the spec)
 
-GitHub PR comments and patch PRs (with human approval), CI/CD-triggered runs, scheduled nightly runs, Slack notifications, a real payment provider, and a Redis/BullMQ queue for multi-instance deployments.
+GitHub PR comments, waiting for GitHub Actions results before marking a fix done, CI/CD-triggered runs, scheduled nightly runs, Slack notifications, a real payment provider, and a Redis/BullMQ queue for multi-instance deployments.
 
 ## Screenshots
 
