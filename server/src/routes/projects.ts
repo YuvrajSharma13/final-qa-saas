@@ -4,6 +4,7 @@ import { rateLimit } from 'express-rate-limit';
 import sharp from 'sharp';
 import { z } from 'zod';
 import { config } from '../config.js';
+import { parseGithubRepoUrl } from '../github/client.js';
 import { encryptSecret } from '../lib/crypto.js';
 import { asyncHandler, HttpError, objectId, parseBody } from '../lib/http.js';
 import { planFor, VIEWPORTS } from '../lib/plans.js';
@@ -44,6 +45,8 @@ const projectSchema = z.object({
 export function validateRepoUrl(repoUrl: string): string {
   if (!repoUrl) return '';
   if (/^https:\/\/github\.com\/[\w.-]+\/[\w.-]+?(\.git)?\/?$/.test(repoUrl)) return repoUrl.replace(/\.git$|\/$/g, '');
+  const ghe = parseGithubRepoUrl(repoUrl);
+  if (ghe && repoUrl.startsWith(config.github.webUrl)) return `${config.github.webUrl}/${ghe.owner}/${ghe.repo}`;
   const isLocal = repoUrl.startsWith('file://') || path.isAbsolute(repoUrl);
   if (isLocal) {
     if (!config.allowLocalRepos) throw new HttpError(400, 'Local repository paths are disabled on this server');
@@ -74,6 +77,9 @@ export function serializeProject(p: ProjectDoc) {
       // Secrets are write-only: the browser only learns whether they exist.
       hasTestPassword: Boolean(s.testPasswordEnc),
       hasGithubToken: Boolean(s.githubTokenEnc),
+      github: s.github?.owner
+        ? { owner: s.github.owner, repo: s.github.repo, baseBranch: s.github.baseBranch, defaultBranch: s.github.defaultBranch, private: s.github.private, linkedAt: s.github.linkedAt }
+        : null,
     },
   };
 }

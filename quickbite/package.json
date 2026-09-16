@@ -5,7 +5,9 @@
   "main": "server.js",
   "scripts": {
     "start": "node server.js",
-    "start:fixed": "QUICKBITE_FIXED=1 node server.js"
+    "start:fixed": "QUICKBITE_FIXED=1 node server.js",
+    "lint": "node scripts/lint.js",
+    "test": "node --test test/*.test.js"
   },
   "dependencies": {
     "express": "^5.1.0"

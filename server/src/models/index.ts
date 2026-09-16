@@ -75,6 +75,16 @@ const projectSchema = new Schema(
       testPasswordEnc: { type: String, default: '' },
       githubTokenEnc: { type: String, default: '' },
       notifyOnCritical: { type: Boolean, default: true },
+      // Repository selected through the GitHub integration.
+      github: {
+        owner: { type: String, default: '' },
+        repo: { type: String, default: '' },
+        baseBranch: { type: String, default: '' },
+        defaultBranch: { type: String, default: '' },
+        private: { type: Boolean, default: false },
+        connectedBy: { type: ObjectId, ref: 'User' },
+        linkedAt: Date,
+      },
     },
     lastRun: {
       runId: { type: ObjectId, ref: 'TestRun' },
@@ -241,6 +251,102 @@ const notificationSchema = new Schema(
   opts,
 );
 export const Notification = mongoose.model('Notification', notificationSchema, 'notifications');
+
+// ---------------------------------------------------------------- githubConnections
+// One GitHub identity per SaaS user. The access token is AES-256-GCM encrypted and never serialised to clients.
+const githubConnectionSchema = new Schema(
+  {
+    userId: { type: ObjectId, ref: 'User', required: true, unique: true },
+    githubUserId: { type: Number, required: true, index: true },
+    login: { type: String, required: true },
+    name: String,
+    email: String,
+    avatarUrl: String,
+    method: { type: String, enum: ['oauth', 'token'], required: true },
+    scopes: { type: [String], default: [] },
+    tokenEnc: { type: String, required: true },
+    lastUsedAt: Date,
+    lastError: String,
+  },
+  opts,
+);
+export const GithubConnection = mongoose.model('GithubConnection', githubConnectionSchema, 'githubConnections');
+
+// ---------------------------------------------------------------- autoFixes
+export const AUTOFIX_STATUSES = [
+  'queued',
+  'generating',
+  'awaiting_approval',
+  'applying',
+  'validating',
+  'committing',
+  'pushing',
+  'creating_pr',
+  'pr_open',
+  'merged',
+  'closed',
+  'rejected',
+  'failed',
+  'canceled',
+] as const;
+export type AutoFixStatus = (typeof AUTOFIX_STATUSES)[number];
+
+const fixAttemptSchema = new Schema(
+  {
+    n: Number,
+    engine: String,
+    explanation: String,
+    edits: { type: [Mixed], default: [] },
+    files: { type: [{ path: String, before: String, after: String, additions: Number, deletions: Number, _id: false }], default: [] },
+    diff: String,
+    patchHash: String,
+    feedback: String,
+    validation: { type: Mixed },
+    status: { type: String, default: 'proposed' },
+    error: String,
+    createdAt: { type: Date, default: () => new Date() },
+    approvedBy: { type: ObjectId, ref: 'User' },
+    approvedAt: Date,
+  },
+  { _id: false },
+);
+
+const autoFixSchema = new Schema(
+  {
+    bugId: { type: ObjectId, ref: 'Bug', required: true, index: true },
+    projectId: { type: ObjectId, ref: 'Project', required: true, index: true },
+    workspaceId: { type: ObjectId, ref: 'Workspace', required: true, index: true },
+    createdBy: { type: ObjectId, ref: 'User', required: true },
+    status: { type: String, enum: AUTOFIX_STATUSES, default: 'queued', index: true },
+    repo: {
+      owner: String,
+      name: String,
+      baseBranch: String,
+      baseSha: String,
+      defaultBranch: String,
+    },
+    branch: String,
+    commitSha: String,
+    attempts: { type: [fixAttemptSchema], default: [] },
+    baseline: { type: Mixed },
+    pr: {
+      number: Number,
+      url: String,
+      state: String,
+      merged: Boolean,
+      draft: Boolean,
+      mergeable: { type: Mixed },
+      checks: { type: Mixed },
+      title: String,
+      updatedAt: Date,
+    },
+    events: { type: [{ ts: Date, level: String, step: String, message: String, _id: false }], default: [] },
+    error: String,
+  },
+  opts,
+);
+export const AutoFix = mongoose.model('AutoFix', autoFixSchema, 'autoFixes');
+export type AutoFixDocument = mongoose.HydratedDocument<InferSchemaType<typeof autoFixSchema>>;
 
 export type ProjectDoc = InferSchemaType<typeof projectSchema> & { _id: Types.ObjectId };
 export type BugDoc = InferSchemaType<typeof bugSchema> & { _id: Types.ObjectId };

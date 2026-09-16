@@ -1,6 +1,7 @@
 import type { Browser } from 'playwright-core';
 import type { Types } from 'mongoose';
 import { llmEnabled } from '../ai/llm.js';
+import { tokenForProject } from '../github/connection.js';
 import { decryptSecret } from '../lib/crypto.js';
 import { notifyWorkspace } from '../lib/notify.js';
 import { planFor } from '../lib/plans.js';
@@ -65,7 +66,7 @@ export async function executeRun(runId: string, isCanceled: () => boolean) {
   let githubToken = '';
   try {
     if (s.testUsername && s.testPasswordEnc) credentials = { username: s.testUsername, password: decryptSecret(s.testPasswordEnc) };
-    githubToken = s.githubTokenEnc ? decryptSecret(s.githubTokenEnc) : '';
+    githubToken = (await tokenForProject(project, run.triggeredBy))?.token || '';
   } catch {
     pending.push({ ts: new Date(), agent: 'orchestrator', level: 'warn', message: 'Stored secrets could not be decrypted (encryption key changed?) — continuing without them' });
   }
@@ -82,6 +83,7 @@ export async function executeRun(runId: string, isCanceled: () => boolean) {
     maxPages: cfg.maxPages,
     credentials,
     githubToken,
+    repoBranch: s.github?.baseBranch || '',
     aiCalls: 0,
     isCanceled,
     // Secrets are scrubbed from every log line before it is stored or displayed.

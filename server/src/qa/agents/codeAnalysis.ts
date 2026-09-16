@@ -5,6 +5,7 @@ import { askJson, llmEnabled } from '../../ai/llm.js';
 import { config } from '../../config.js';
 import { sanitizeText } from '../../lib/sanitize.js';
 import { Bug, type BugDoc } from '../../models/index.js';
+import { GitHubClient, parseGithubRepoUrl } from '../../github/client.js';
 import type { RunContext } from '../types.js';
 
 /**
@@ -41,32 +42,35 @@ export async function loadLocalRepo(root: string): Promise<RepoFile[]> {
   return files;
 }
 
-export async function loadGithubRepo(repoUrl: string, token: string, relevance: (p: string) => number, log: (m: string) => void): Promise<RepoFile[]> {
-  const m = repoUrl.match(/github\.com\/([\w.-]+)\/([\w.-]+)/);
-  if (!m) throw new Error('Unsupported repository URL');
-  const [, owner, repo] = m;
-  const headers: Record<string, string> = { 'User-Agent': 'ai-qa-saas', Accept: 'application/vnd.github+json' };
-  if (token) headers.Authorization = `Bearer ${token}`;
-  const gh = async (url: string) => {
-    const res = await fetch(url, { headers, signal: AbortSignal.timeout(15000) });
-    if (!res.ok) throw new Error(`GitHub API ${res.status} for ${url.replace(/\?.*/, '')}`);
-    return res.json() as Promise<Record<string, unknown>>;
-  };
-  const meta = await gh(`https://api.github.com/repos/${owner}/${repo}`);
-  const branch = String(meta.default_branch || 'main');
-  const tree = (await gh(`https://api.github.com/repos/${owner}/${repo}/git/trees/${encodeURIComponent(branch)}?recursive=1`)) as { tree?: { path: string; type: string; size?: number }[] };
+export async function loadGithubRepo(
+  repoUrl: string,
+  token: string,
+  relevance: (p: string) => number,
+  log: (m: string) => void,
+  branchName?: string,
+): Promise<RepoFile[]> {
+  const parsed = parseGithubRepoUrl(repoUrl);
+  if (!parsed) throw new Error('Unsupported repository URL');
+  const { owner, repo } = parsed;
+  const client = new GitHubClient(token);
+  const branch = branchName || (await client.getRepo(owner, repo)).default_branch;
+  const tree = await client.getTree(owner, repo, branch);
   const candidates = (tree.tree || [])
     .filter((t) => t.type === 'blob' && EXT.test(t.path) && !SKIP_DIR.test(t.path) && (t.size ?? 0) <= 300_000)
     .sort((a, b) => relevance(b.path) - relevance(a.path))
     .slice(0, 80);
   log(`GitHub ${owner}/${repo}@${branch}: fetching ${candidates.length} candidate files`);
   const files: RepoFile[] = [];
-  for (const c of candidates) {
-    const res = await fetch(`https://raw.githubusercontent.com/${owner}/${repo}/${encodeURIComponent(branch)}/${c.path.split('/').map(encodeURIComponent).join('/')}`, {
-      headers: token ? { Authorization: `Bearer ${token}` } : {},
-      signal: AbortSignal.timeout(10000),
-    }).catch(() => null);
-    if (res?.ok) files.push({ path: c.path, content: await res.text() });
+  for (let i = 0; i < candidates.length; i += 8) {
+    const batch = await Promise.all(
+      candidates.slice(i, i + 8).map((c) =>
+        client
+          .getFileRaw(owner, repo, c.path, branch)
+          .then((content) => ({ path: c.path, content: typeof content === 'string' ? content : JSON.stringify(content, null, 2) }))
+          .catch(() => null),
+      ),
+    );
+    files.push(...(batch.filter(Boolean) as RepoFile[]));
   }
   return files;
 }
@@ -173,6 +177,8 @@ function insideValidator(lines: string[], i: number) {
 
 /** Detects well-known defect patterns in a file and proposes a concrete patch where possible. */
 export function detectPatterns(file: RepoFile, bug: Pick<BugDoc, 'category' | 'title' | 'location'>): CodeHit[] {
+  // Test suites are evidence, not defect locations: never propose patches to them.
+  if (/(^|\/)(tests?|__tests__|spec|e2e)\/|\.(test|spec)\.[cm]?[jt]sx?$/.test(file.path)) return [];
   const loc = (bug.location || {}) as Loc;
   const hits: CodeHit[] = [];
   const lines = file.content.split('\n');
@@ -207,7 +213,10 @@ export function detectPatterns(file: RepoFile, bug: Pick<BugDoc, 'category' | 't
       if (m) {
         const v = m[1];
         const window = lines.slice(i + 1, i + 5).join('\n');
-        if (new RegExp(`\\b${v}\\.\\w+`).test(window) && !new RegExp(`!\\s*${v}\\b|${v}\\s*[=!]==?\\s*(null|undefined)|${v}\\?\\.`).test(window)) {
+        const guarded = new RegExp(`!\\s*${v}\\b|${v}\\s*[=!]==?\\s*(null|undefined)|${v}\\?\\.|if\\s*\\(\\s*${v}\\s*[)&|]|\\b${v}\\s*&&|\\b${v}\\s*\\?`).test(window);
+        // Only request handlers: the suggested guard answers with an HTTP error response.
+        const inHandler = /\bres\.(status|json|send)\(/.test(lines.slice(Math.max(0, i - 15), i + 15).join('\n'));
+        if (inHandler && new RegExp(`\\b${v}\\.\\w+`).test(window) && !guarded) {
           const indent = line.match(/^\s*/)?.[0] || '';
           hits.push({
             path: file.path, line: i + 1, snippet: snippetAt(lines, i, 1, 4), pattern: 'missing-null-check',
@@ -289,13 +298,19 @@ function genericFix(bug: Pick<BugDoc, 'category'>) {
       : 'Fix the workflow handler and cover it with the generated regression test.';
 }
 
-export async function analyzeBugAgainstRepo(bug: BugDoc, files: RepoFile[]) {
+/** Ranked candidate files and detected defect patterns for a bug (shared by Code Analysis and Auto-fix). */
+export function collectHits(bug: Pick<BugDoc, 'category' | 'title' | 'location'>, files: RepoFile[]) {
   const terms = searchTerms(bug);
   const ranked = rankFiles(files, terms, bug.category).slice(0, 6);
   const hits: CodeHit[] = [];
   for (const r of ranked) hits.push(...detectPatterns(r.file, bug));
   // Root-cause patterns (server/data/style) outrank symptom patterns (client error handling).
   hits.sort((a, b) => PATTERN_PRIORITY.indexOf(a.pattern || '') - PATTERN_PRIORITY.indexOf(b.pattern || ''));
+  return { terms, ranked, hits };
+}
+
+export async function analyzeBugAgainstRepo(bug: BugDoc, files: RepoFile[]) {
+  const { terms, ranked, hits } = collectHits(bug, files);
   // Pattern hits first; otherwise point at the best term match.
   const refs: CodeHit[] = [...hits];
   for (const r of ranked.slice(0, 3)) {
@@ -336,8 +351,9 @@ export async function runCodeAnalysis(ctx: RunContext, bugIds: Types.ObjectId[])
   } else {
     const allTerms = bugs.flatMap((b) => searchTerms(b));
     const relevance = (p: string) => allTerms.reduce((s, t) => s + (p.toLowerCase().includes(t.text.toLowerCase().replace(/^['"/]+/, '')) ? t.weight : 0), 0) + (/src|app|routes|components|styles|public/.test(p) ? 1 : 0);
-    files = await loadGithubRepo(ctx.repoUrl, ctx.githubToken, relevance, (m) => ctx.log('code_analysis', m));
-    source = ctx.repoUrl.replace(/^https:\/\/github\.com\//, 'github:');
+    files = await loadGithubRepo(ctx.repoUrl, ctx.githubToken, relevance, (m) => ctx.log('code_analysis', m), ctx.repoBranch || undefined);
+    const pr = parseGithubRepoUrl(ctx.repoUrl);
+    source = pr ? `github:${pr.owner}/${pr.repo}${ctx.repoBranch ? `@${ctx.repoBranch}` : ''}` : ctx.repoUrl;
   }
   ctx.log('code_analysis', `Indexed ${files.length} source files from ${source}`);
   const results: Record<string, unknown>[] = [];

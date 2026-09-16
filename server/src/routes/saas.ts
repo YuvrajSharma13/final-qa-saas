@@ -4,7 +4,35 @@ import { asyncHandler, HttpError, objectId, parseBody } from '../lib/http.js';
 import { PLANS, planFor, type PlanId } from '../lib/plans.js';
 import { currentUsage } from '../lib/usage.js';
 import { requireWorkspaceRole } from '../middleware/auth.js';
-import { Bug, Member, Notification, Project, TestRun, User, Workspace } from '../models/index.js';
+import type { Types } from 'mongoose';
+import { refreshPrStatus } from '../autofix/service.js';
+import { publicConnection } from '../github/connection.js';
+import { AutoFix, Bug, GithubConnection, Member, Notification, Project, TestRun, User, Workspace } from '../models/index.js';
+
+/** GitHub integration panel for the dashboard: connection, linked repos/branches and AI fix PR status. */
+async function githubSummary(userId: Types.ObjectId, workspaceId: Types.ObjectId, projects: { _id: Types.ObjectId; name: string; settings?: { github?: { owner?: string | null; repo?: string | null; baseBranch?: string | null } | null } | null }[]) {
+  const conn = await GithubConnection.findOne({ userId }).lean();
+  const stale = await AutoFix.find({ workspaceId, status: 'pr_open', $or: [{ 'pr.updatedAt': { $lt: new Date(Date.now() - 2 * 60_000) } }, { 'pr.updatedAt': null }] }).limit(5);
+  if (conn && stale.length) await Promise.all(stale.map((f) => refreshPrStatus(f, userId).catch(() => undefined)));
+  const fixes = await AutoFix.find({ workspaceId }, { status: 1, repo: 1, branch: 1, pr: 1, bugId: 1, projectId: 1, updatedAt: 1, createdAt: 1, error: 1 }).sort({ updatedAt: -1 }).limit(8).lean();
+  const bugs = await Bug.find({ _id: { $in: fixes.map((f) => f.bugId) } }, { title: 1 }).lean();
+  const counts = await AutoFix.aggregate<{ _id: string; n: number }>([{ $match: { workspaceId } }, { $group: { _id: '$status', n: { $sum: 1 } } }]);
+  const by = Object.fromEntries(counts.map((c) => [c._id, c.n]));
+  return {
+    connection: conn ? publicConnection(conn) : { connected: false },
+    repositories: projects
+      .filter((p) => p.settings?.github?.owner)
+      .map((p) => ({ projectId: p._id, projectName: p.name, owner: p.settings!.github!.owner, repo: p.settings!.github!.repo, baseBranch: p.settings!.github!.baseBranch })),
+    fixes: fixes.map((f) => ({ ...f, bugTitle: bugs.find((b) => String(b._id) === String(f.bugId))?.title })),
+    counts: {
+      awaitingApproval: by.awaiting_approval || 0,
+      inProgress: ['queued', 'generating', 'applying', 'validating', 'committing', 'pushing', 'creating_pr'].reduce((s, k) => s + (by[k] || 0), 0),
+      openPrs: by.pr_open || 0,
+      merged: by.merged || 0,
+      failed: by.failed || 0,
+    },
+  };
+}
 
 // ------------------------------------------------------------------ dashboard
 export const dashboardRouter = Router();
@@ -88,6 +116,7 @@ dashboardRouter.get(
       plan: { id: plan.id, name: plan.name, runsPerMonth: plan.runsPerMonth, maxProjects: plan.maxProjects },
       usage,
       unreadNotifications: unread,
+      github: await githubSummary(req.user!.id, wsId, projects),
     });
   }),
 );

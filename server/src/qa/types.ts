@@ -236,6 +236,7 @@ export interface RunContext {
   maxPages: number;
   credentials: { username: string; password: string } | null;
   githubToken: string;
+  repoBranch?: string;
   log: (agent: string, message: string, level?: 'info' | 'warn' | 'error') => void;
   isCanceled: () => boolean;
   aiCalls: number;

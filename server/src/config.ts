@@ -43,4 +43,25 @@ export const config = {
   mailFrom: process.env.MAIL_FROM || 'AI QA <qa@example.com>',
   internalToken: process.env.INTERNAL_API_TOKEN || '',
   webDist: path.resolve(process.env.WEB_DIST || path.join(process.cwd(), '..', 'web', 'dist')),
+  github: {
+    // OAuth App (Settings → Developer settings → OAuth Apps). Optional: users can also connect a fine-grained token.
+    clientId: process.env.GITHUB_CLIENT_ID || '',
+    clientSecret: process.env.GITHUB_CLIENT_SECRET || '',
+    // Public URL GitHub redirects back to; defaults to <request origin>/api/github/oauth/callback.
+    callbackUrl: process.env.GITHUB_OAUTH_CALLBACK_URL || '',
+    scopes: process.env.GITHUB_OAUTH_SCOPES || 'repo read:user user:email',
+    // github.com by default; set both for GitHub Enterprise Server.
+    apiUrl: (process.env.GITHUB_API_URL || 'https://api.github.com').replace(/\/$/, ''),
+    webUrl: (process.env.GITHUB_WEB_URL || 'https://github.com').replace(/\/$/, ''),
+  },
+  autofix: {
+    enabled: bool(process.env.AUTOFIX_ENABLED, true),
+    workDir: path.resolve(process.env.AUTOFIX_WORK_DIR || './.autofix-work'),
+    maxAttempts: Math.max(1, Number(process.env.AUTOFIX_MAX_ATTEMPTS || 3)),
+    // Validation executes the repository's own scripts: run the API in an isolated container in production.
+    runValidation: bool(process.env.AUTOFIX_RUN_VALIDATION, true),
+    installTimeoutMs: Number(process.env.AUTOFIX_INSTALL_TIMEOUT_MS || 10 * 60 * 1000),
+    stepTimeoutMs: Number(process.env.AUTOFIX_STEP_TIMEOUT_MS || 10 * 60 * 1000),
+    branchPrefix: 'ai-fix/',
+  },
 };

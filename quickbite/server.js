@@ -48,7 +48,11 @@ app.use(express.static(path.join(__dirname, 'public')));
 
 // Express default error handler is used on purpose: unhandled exceptions become
 // HTML 500 pages, exactly like many small production apps.
-const PORT = Number(process.env.PORT || 4100);
-app.listen(PORT, () => {
-  console.log(`QuickBite listening on http://localhost:${PORT} (mode: ${mode.isFixed() ? 'fixed' : 'buggy'})`);
-});
+if (require.main === module) {
+  const PORT = Number(process.env.PORT || 4100);
+  app.listen(PORT, () => {
+    console.log(`QuickBite listening on http://localhost:${PORT} (mode: ${mode.isFixed() ? 'fixed' : 'buggy'})`);
+  });
+}
+
+module.exports = app;

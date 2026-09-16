@@ -11,6 +11,8 @@ import { errorHandler, HttpError } from './lib/http.js';
 import { requireAuth, withWorkspace } from './middleware/auth.js';
 import { agentsRouter } from './routes/agents.js';
 import { authRouter } from './routes/auth.js';
+import { autofixRouter } from './routes/autofix.js';
+import { githubRouter } from './routes/github.js';
 import { bugsRouter } from './routes/bugs.js';
 import { projectsRouter } from './routes/projects.js';
 import { runsRouter, screenshotsRouter } from './routes/runs.js';
@@ -25,7 +27,7 @@ export function createApp() {
       contentSecurityPolicy: {
         directives: {
           defaultSrc: ["'self'"],
-          imgSrc: ["'self'", 'data:', 'blob:'],
+          imgSrc: ["'self'", 'data:', 'blob:', 'https://avatars.githubusercontent.com'],
           styleSrc: ["'self'", "'unsafe-inline'", 'https://fonts.googleapis.com'],
           fontSrc: ["'self'", 'https://fonts.gstatic.com', 'data:'],
           scriptSrc: ["'self'"],
@@ -54,6 +56,7 @@ export function createApp() {
 
   app.use('/api/auth', authRouter);
   app.use('/api/agents', agentsRouter);
+  app.use('/api/github', githubRouter);
 
   const authed = express.Router();
   authed.use(requireAuth, withWorkspace);
@@ -65,6 +68,7 @@ export function createApp() {
   authed.use('/billing', billingRouter);
   authed.use('/workspaces', workspaceRouter);
   authed.use('/notifications', notificationsRouter);
+  authed.use('/autofixes', autofixRouter);
   app.use('/api', authed);
   app.use('/api', (_req, _res, next) => next(new HttpError(404, 'Not found')));
 
