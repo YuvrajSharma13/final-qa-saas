@@ -110,8 +110,7 @@ export function branchNameFor(bugTitle: string, bugId: string) {
   const slug = bugTitle
     .toLowerCase()
     .replace(/[^a-z0-9]+/g, '-')
-    .replace(/^-+|-+$/g, '')
-    .slice(0, 40)
-    .replace(/-+$/, '');
-  return `${config.autofix.branchPrefix}${slug || 'bug'}-${bugId.slice(-6)}`;
+    .replace(/^-+|-+$/g, '');
+  const cut = slug.length > 40 ? slug.slice(0, 41).replace(/-[^-]*$/, '') : slug;
+  return `${config.autofix.branchPrefix}${cut || 'bug'}-${bugId.slice(-6)}`;
 }
