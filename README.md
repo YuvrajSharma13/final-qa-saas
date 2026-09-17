@@ -1,5 +1,8 @@
 # AI QA SaaS
 
+[![Deploy to Render](https://render.com/images/deploy-to-render-button.svg)](https://render.com/deploy?repo=https://github.com/YuvrajSharma13/final-qa-saas)
+[![Deploy with Vercel](https://vercel.com/button)](https://vercel.com/new/clone?repository-url=https%3A%2F%2Fgithub.com%2FYuvrajSharma13%2Ffinal-qa-saas&root-directory=web&env=VITE_API_URL)
+
 A developer QA platform delivered as SaaS, built for small businesses and small development teams.
 A developer connects a web application (plus, optionally, a GitHub repository and an OpenAPI spec).
 Seven specialised agents then plan and run functional, API and computer-vision tests, merge related
