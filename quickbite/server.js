@@ -29,7 +29,7 @@ app.use('/api', authRoutes);
 app.use('/api', menuRoutes);
 app.use('/api', orderRoutes);
 
-app.get('/openapi.json', (_req, res) => res.sendFile(path.join(__dirname, 'openapi.json')));
+app.get('/openapi.json', (_req, res) => res.sendFile(path.join(__dirname, 'openapi.json'), { dotfiles: 'allow' }));
 
 // Pages get a body class so the stylesheet can switch between buggy/fixed layout.
 const PAGES = ['index', 'login', 'menu', 'cart', 'checkout', 'order'];

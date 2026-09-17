@@ -24,6 +24,7 @@ export const config = {
   jwtSecret: required('JWT_SECRET', 'dev-only-jwt-secret'),
   encryptionKey: required('APP_ENCRYPTION_KEY', 'dev-only-encryption-key'),
   appUrl: process.env.APP_URL || 'http://localhost:5173',
+  corsOrigins: (process.env.CORS_ORIGIN || process.env.FRONTEND_URL || process.env.APP_URL || '').split(',').map((s) => s.trim()).filter(Boolean),
   chromiumPath: process.env.CHROMIUM_PATH || (fs.existsSync('/opt/pw-browsers/chromium') ? '/opt/pw-browsers/chromium' : undefined),
   allowPrivateTargets: bool(process.env.ALLOW_PRIVATE_TARGETS, !isProd),
   allowLocalRepos: bool(process.env.ALLOW_LOCAL_REPOS, !isProd),

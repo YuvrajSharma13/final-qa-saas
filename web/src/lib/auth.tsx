@@ -1,5 +1,5 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useState, type ReactNode } from 'react';
-import { api, getWorkspaceId, setWorkspaceId } from './api';
+import { api, getWorkspaceId, setToken, setWorkspaceId } from './api';
 
 export interface WorkspaceInfo {
   id: string;
@@ -67,15 +67,18 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       loading,
       refresh,
       login: async (email, password) => {
-        await api('/auth/login', { method: 'POST', body: { email, password } });
+        const res = await api<{ token?: string }>('/auth/login', { method: 'POST', body: { email, password } });
+        if (res.token) setToken(res.token);
         await refresh();
       },
       register: async (input) => {
-        await api('/auth/register', { method: 'POST', body: input });
+        const res = await api<{ token?: string }>('/auth/register', { method: 'POST', body: input });
+        if (res.token) setToken(res.token);
         await refresh();
       },
       logout: async () => {
         await api('/auth/logout', { method: 'POST' }).catch(() => undefined);
+        setToken('');
         setUser(null);
         setWorkspaces([]);
       },

@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
-import { api, useApi, type AutoFix, type AutoFixStatus, type GithubConnection, type Project, type PullInfo } from '../lib/api';
+import { api, API_BASE, useApi, type AutoFix, type AutoFixStatus, type GithubConnection, type Project, type PullInfo } from '../lib/api';
 import { timeAgo } from '../lib/format';
 import { Icon } from './icons';
 import { Badge, Button, cx, ErrorBox, Field, Input, Select, Spinner } from './ui';
@@ -126,7 +126,7 @@ export function GithubConnectionPanel({ onChange }: { onChange?: () => void }) {
         <div className="space-y-4">
           <div className="flex flex-wrap items-center gap-3">
             {data.oauthConfigured ? (
-              <a href="/api/github/oauth/start?mode=connect" className="inline-flex items-center gap-2 rounded-lg bg-ink-100 px-3.5 py-2 text-sm font-semibold text-ink-950 hover:bg-white">
+              <a href={`${API_BASE}/api/github/oauth/start?mode=connect`} className="inline-flex items-center gap-2 rounded-lg bg-ink-100 px-3.5 py-2 text-sm font-semibold text-ink-950 hover:bg-white">
                 <Icon name="github" /> Connect with GitHub
               </a>
             ) : (

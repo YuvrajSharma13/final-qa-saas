@@ -36,7 +36,7 @@ export function signSession(user: { _id: Types.ObjectId; email: string; name: st
 export function setSessionCookie(res: Response, token: string) {
   res.cookie(SESSION_COOKIE, token, {
     httpOnly: true,
-    sameSite: 'lax',
+    sameSite: config.isProd ? 'none' : 'lax',
     secure: config.isProd,
     maxAge: 7 * 24 * 3600 * 1000,
     path: '/',

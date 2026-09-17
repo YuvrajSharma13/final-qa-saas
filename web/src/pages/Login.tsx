@@ -3,7 +3,7 @@ import { Navigate, useSearchParams } from 'react-router-dom';
 import { Logo } from '../components/Layout';
 import { Icon } from '../components/icons';
 import { Button, ErrorBox, Field, Input, Tabs } from '../components/ui';
-import { useApi } from '../lib/api';
+import { API_BASE, useApi } from '../lib/api';
 import { useAuth } from '../lib/auth';
 
 export default function Login() {
@@ -82,7 +82,7 @@ export default function Login() {
                 <span className="h-px flex-1 bg-ink-700" /> or <span className="h-px flex-1 bg-ink-700" />
               </div>
               <a
-                href={`/api/github/oauth/start?mode=login&next=${encodeURIComponent(target)}`}
+                href={`${API_BASE}/api/github/oauth/start?mode=login&next=${encodeURIComponent(target)}`}
                 className="flex w-full items-center justify-center gap-2 rounded-lg bg-ink-100 px-3.5 py-2 text-sm font-semibold text-ink-950 hover:bg-white"
               >
                 <Icon name="github" /> Continue with GitHub

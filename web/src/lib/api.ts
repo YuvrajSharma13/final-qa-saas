@@ -7,6 +7,10 @@ export class ApiError extends Error {
 }
 
 const WS_KEY = 'aiqa.workspace';
+const TOKEN_KEY = 'aiqa.token';
+
+export const API_BASE = ((import.meta.env.VITE_API_URL as string) || '').replace(/\/$/, '');
+
 export const getWorkspaceId = () => {
   try {
     return localStorage.getItem(WS_KEY) || '';
@@ -22,12 +26,30 @@ export const setWorkspaceId = (id: string) => {
   }
 };
 
+export const getToken = () => {
+  try {
+    return localStorage.getItem(TOKEN_KEY) || '';
+  } catch {
+    return '';
+  }
+};
+export const setToken = (token: string) => {
+  try {
+    if (token) localStorage.setItem(TOKEN_KEY, token);
+    else localStorage.removeItem(TOKEN_KEY);
+  } catch {
+    /* ignore */
+  }
+};
+
 export async function api<T = unknown>(path: string, opts: { method?: string; body?: unknown; signal?: AbortSignal } = {}): Promise<T> {
   const headers: Record<string, string> = { Accept: 'application/json' };
   if (opts.body !== undefined) headers['Content-Type'] = 'application/json';
   const ws = getWorkspaceId();
   if (ws) headers['X-Workspace-Id'] = ws;
-  const res = await fetch(`/api${path}`, {
+  const token = getToken();
+  if (token) headers['Authorization'] = `Bearer ${token}`;
+  const res = await fetch(`${API_BASE}/api${path}`, {
     method: opts.method || 'GET',
     headers,
     credentials: 'include',
@@ -387,4 +409,4 @@ export interface AutoFix {
 
 export const FIX_ACTIVE: AutoFixStatus[] = ['queued', 'generating', 'applying', 'validating', 'committing', 'pushing', 'creating_pr'];
 
-export const shotUrl =(id: string, annotated = false) => `/api/screenshots/${id}/image${annotated ? '?variant=annotated' : ''}`;
+export const shotUrl = (id: string, annotated = false) => `${API_BASE}/api/screenshots/${id}/image${annotated ? '?variant=annotated' : ''}`;

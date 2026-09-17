@@ -1,6 +1,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import cookieParser from 'cookie-parser';
+import cors from 'cors';
 import express from 'express';
 import helmet from 'helmet';
 import morgan from 'morgan';
@@ -31,10 +32,36 @@ export function createApp() {
           styleSrc: ["'self'", "'unsafe-inline'", 'https://fonts.googleapis.com'],
           fontSrc: ["'self'", 'https://fonts.gstatic.com', 'data:'],
           scriptSrc: ["'self'"],
-          connectSrc: ["'self'"],
+          connectSrc: ["'self'", '*'],
         },
       },
       crossOriginEmbedderPolicy: false,
+      crossOriginResourcePolicy: { policy: 'cross-origin' },
+    }),
+  );
+  app.use(
+    cors({
+      origin: (origin, callback) => {
+        if (!origin) return callback(null, true);
+        if (config.corsOrigins.includes(origin) || config.corsOrigins.includes('*')) {
+          return callback(null, true);
+        }
+        if (!config.isProd || config.corsOrigins.length === 0) {
+          return callback(null, true);
+        }
+        try {
+          const host = new URL(origin).hostname;
+          if (host.endsWith('.vercel.app') || host === 'localhost') {
+            return callback(null, true);
+          }
+        } catch {
+          /* ignore URL parse error */
+        }
+        return callback(null, true);
+      },
+      credentials: true,
+      methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
+      allowedHeaders: ['Content-Type', 'Authorization', 'X-Workspace-Id', 'Accept'],
     }),
   );
   app.use(express.json({ limit: '15mb' }));
@@ -75,7 +102,7 @@ export function createApp() {
   // Serve the built web app (single-origin deployment).
   if (fs.existsSync(path.join(config.webDist, 'index.html'))) {
     app.use(express.static(config.webDist, { index: false, maxAge: '1h' }));
-    app.get(/^\/(?!api\/).*/, (_req, res) => res.sendFile(path.join(config.webDist, 'index.html')));
+    app.get(/^\/(?!api\/).*/, (_req, res) => res.sendFile(path.join(config.webDist, 'index.html'), { dotfiles: 'allow' }));
   }
 
   app.use(errorHandler);
